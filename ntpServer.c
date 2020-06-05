@@ -4,18 +4,18 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <signal.h>
-#include <sys/time.h> /* gettimeofday() */
+#include <sys/time.h> 
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/socket.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <time.h> /* for time() and ctime() */
+#include <time.h>
 
-#define UTC_NTP 2208988800U /* 1970 - 1900 */
+#define UTC_NTP 2208988800U 
 
-/* get Timestamp for NTP in LOCAL ENDIAN */
+
 void gettime64(uint32_t ts[])
 {
 	struct timeval tv;
@@ -61,70 +61,58 @@ int ntp_reply(
 	unsigned char recv_buf[],
 	uint32_t recv_time[])
 {
-	/* Assume that recv_time is in local endian ! */
+	
 	unsigned char send_buf[48];
 	uint32_t *u32p;
 
- 	/* do not use 0xC7 because the LI can be `unsynchronized` */
+ 	
 	if ((recv_buf[0] & 0x07/*0xC7*/) != 0x3) {
-		/* LI VN Mode stimmt nicht */
+		
 		log_ntp_event("Invalid request: found error at the first byte");
 		return 1;
 	}
 
-	/* füllt LI VN Mode aus
-	   	LI   = 0
-		VN   = Version Nummer aus dem Client
-		Mode = 4
-	 */
+	
 	send_buf[0] = (recv_buf[0] & 0x38) + 4;
 
-	/* Stratum = 1 (primary reference)
-	   Reference ID = 'LOCL"
-	       (falscher) Bezug auf der lokalen Uhr.
-	 */
-	/* Stratum */
+	
 	send_buf[1] = 0x01;
-	/* Reference ID = "LOCL" */
+	
 	*(uint32_t*)&send_buf[12] = htonl(0x4C4F434C);
 
-	/* Copy Poll */
+	
 	send_buf[2] = recv_buf[2];
 
-	/* Precision in Microsecond ( from API gettimeofday() ) */
 	send_buf[3] = (signed char)(-6);  /* 2^(-6) sec */
 
-	/* danach sind alle Werte DWORD aligned  */
+	
 	u32p = (uint32_t *)&send_buf[4];
-	/* zur Vereinfachung , Root Delay = 0, Root Dispersion = 0 */
+	
 	*u32p++ = 0;
 	*u32p++ = 0;
 
-	/* Reference ID ist vorher eingetragen */
+	
 	u32p++;
 
-	/* falscher Reference TimeStamp,
-	 * wird immer vor eine minute synchronisiert,
-	 * damit die Überprüfung in Client zu belügen */
+	
 	gettime64(u32p);
-	*u32p = htonl(*u32p - 60);   /* -1 Min.*/
+	*u32p = htonl(*u32p - 60);
 	u32p++;
-	*u32p = htonl(*u32p);   /* -1 Min.*/
+	*u32p = htonl(*u32p);
 	u32p++;
 
-	/* Originate Time = Transmit Time @ Client */
 	*u32p++ = *(uint32_t *)&recv_buf[40];
 	*u32p++ = *(uint32_t *)&recv_buf[44];
 
-	/* Receive Time @ Server */
+
 	*u32p++ = htonl(recv_time[0]);
 	*u32p++ = htonl(recv_time[1]);
 
-	/* zum Schluss: Transmit Time*/
+
 	gettime64(u32p);
-	*u32p = htonl(*u32p);   /* -1 Min.*/
+	*u32p = htonl(*u32p);   
 	u32p++;
-	*u32p = htonl(*u32p);   /* -1 Min.*/
+	*u32p = htonl(*u32p);   
 
 	if ( sendto( socket_fd,
 		     send_buf,
@@ -152,22 +140,21 @@ void request_process_loop(int fd)
 				48, 0,
 				&src_addr,
 				&src_addrlen)
-			< 48 );  /* invalid request */
+			< 48 );  
 
 		gettime64(recv_time);
-		/* recv_time in local endian */
+		
 		log_request_arrive(recv_time);
 
 		pid = fork();
 		if (pid == 0) {
-			/* Child */
+			
 			ntp_reply(fd, &src_addr , src_addrlen, buf, recv_time);
 			exit(0);
 		} else if (pid == -1) {
 			perror("fork() error");
 			die(NULL);
 		}
-		/* return to parent */
 	}
 }
 
@@ -214,6 +201,5 @@ int main(int argc, char *argv[], char **env)
 {
 	signal(SIGCHLD,wait_wrapper);
 	ntp_server();
-	/* nicht erreichbar: */
 	return 0;
 }
