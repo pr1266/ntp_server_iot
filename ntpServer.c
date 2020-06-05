@@ -83,7 +83,7 @@ int ntp_reply(
 	
 	send_buf[2] = recv_buf[2];
 
-	send_buf[3] = (signed char)(-6);  /* 2^(-6) sec */
+	send_buf[3] = (signed char)(-6); 
 
 	
 	u32p = (uint32_t *)&send_buf[4];
